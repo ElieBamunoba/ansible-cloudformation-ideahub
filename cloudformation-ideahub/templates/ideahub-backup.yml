@@ -1,0 +1,130 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to create an S3 bucket, a Lambda function to backup database, and a CloudWatch Log Group for the Lambda function.
+Resources:
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement: 
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaS3RDSSecretsAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - rds:*
+                  - s3:*
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                Resource: '*'
+
+  BackupS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: ideahub-backup-bucket
+      VersioningConfiguration:
+        Status: Enabled
+
+  BackupLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          import boto3
+          import pymysql
+          import os
+          import json
+          from datetime import datetime
+
+          def lambda_handler(event, context):
+              try:
+                  # Fetch secrets from Secrets Manager
+                  secrets_client = boto3.client('secretsmanager')
+                  secret_name = "dev/ideaHub/Mysql"
+                  response = secrets_client.get_secret_value(SecretId=secret_name)
+                  secrets = json.loads(response['SecretString'])
+
+                  db_host = os.environ['DB_HOST']
+                  db_user = secrets['username']
+                  db_password = secrets['password']
+                  db_name = secrets['dbname']
+                  s3_bucket = os.environ['S3_BUCKET']
+
+                  # Connect to the database
+                  connection = pymysql.connect(
+                      host=db_host,
+                      user=db_user,
+                      password=db_password,
+                      database=db_name
+                  )
+
+                  backup_file = f"/tmp/{db_name}_backup_{datetime.now().strftime('%Y%m%d%H%M%S')}.sql"
+                  
+                  # Dump database to a file
+                  with connection.cursor() as cursor:
+                      cursor.execute("SHOW TABLES")
+                      tables = cursor.fetchall()
+                      with open(backup_file, 'w') as f:
+                          for table in tables:
+                              cursor.execute(f"SHOW CREATE TABLE {table[0]}")
+                              create_table_stmt = cursor.fetchone()[1]
+                              f.write(f"{create_table_stmt};\n\n")
+                              cursor.execute(f"SELECT * FROM {table[0]}")
+                              rows = cursor.fetchall()
+                              for row in rows:
+                                  row_data = ', '.join([str(elem) for elem in row])
+                                  f.write(f"INSERT INTO {table[0]} VALUES ({row_data});\n")
+
+                  # Upload the backup file to S3
+                  s3 = boto3.client('s3')
+                  s3.upload_file(backup_file, s3_bucket, os.path.basename(backup_file))
+
+                  os.remove(backup_file)
+                  return {
+                      'statusCode': 200,
+                      'body': f"Backup successful and uploaded to S3 bucket {s3_bucket}"
+                  }
+              except Exception as e:
+                  print(f"Error: {str(e)}")
+                  return {
+                      'statusCode': 500,
+                      'body': f"Backup failed: {str(e)}"
+                  }
+      Runtime: python3.8
+      Layers:
+        - arn:aws:lambda:ap-south-1:925413096657:layer:new-layer:1
+      Environment:
+        Variables:
+          DB_HOST: "43.205.229.178"
+          DB_USER: "{{resolve:secretsmanager:dev/ideaHub/Mysql:SecretString:username}}"
+          DB_PASSWORD: "{{resolve:secretsmanager:dev/ideaHub/Mysql:SecretString:password}}"
+          DB_NAME: "{{resolve:secretsmanager:dev/ideaHub/Mysql:SecretString:dbname}}"
+          S3_BUCKET: !Ref BackupS3Bucket
+
+  BackupSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: 'rate(1 minute)'  # Run every 1 minutes
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt BackupLambdaFunction.Arn
+          Id: "BackupLambdaFunction"
+
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref BackupLambdaFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt BackupSchedule.Arn

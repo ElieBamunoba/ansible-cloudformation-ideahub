@@ -1,0 +1,7 @@
+**venv
+**venv/
+**env
+**env/
+secret.yml
+elie-ec2.pem
+ansible-ideahub/elie-ec2.pem

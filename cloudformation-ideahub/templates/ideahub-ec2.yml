@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to create an EC2 instance for the IdeaHub project.
+
+Parameters:
+  InstanceType:
+    Description: The EC2 instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+    ConstraintDescription: must be a valid EC2 instance type.
+    
+  KeyName:
+    Description: The EC2 Key Pair to allow SSH access to the instance
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: elie-ec2
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+    
+  ImageId:
+    Description: The EC2 Image ID for the instance
+    Type: AWS::EC2::Image::Id
+    Default: ami-0ad21ae1d0696ad58
+    ConstraintDescription: must be a valid AMI ID.
+    
+  SecurityGroup:
+    Description: The security group for the EC2 instance
+    Type: AWS::EC2::SecurityGroup::Id
+    Default: sg-04b25b88d0a3ba979
+    ConstraintDescription: must be a valid security group ID.
+
+Resources:
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties: 
+      InstanceType: 
+        Ref: InstanceType
+      KeyName: 
+        Ref: KeyName
+      ImageId: 
+        Ref: ImageId
+      SecurityGroupIds: 
+        - Ref: SecurityGroup
+      Tags:
+        - Key: Name
+          Value: IdeaHub-Instance
+          
+
+Outputs:
+  InstanceId:
+    Description: The Instance ID of the created EC2 instance
+    Value: 
+      Ref: EC2Instance
+  PublicIP:
+    Description: The public IP address of the EC2 instance
+    Value: 
+      Fn::GetAtt: 
+        - EC2Instance
+        - PublicIp
