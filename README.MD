@@ -1,6 +1,6 @@
 # Bright Ideas Deployment and Configuration
 
-This project outlines the deployment and configuration of the Bright Ideas application using AWS CloudFormation and Ansible. The primary focus is on setting up an EC2 instance as a MySQL server, launched by CloudFormation and configured by Ansible.
+This project outlines the deployment and configuration of the Bright Ideas application using AWS CloudFormation and Ansible.
 
 ## Prerequisites
 
@@ -52,13 +52,12 @@ This directory contains Ansible configurations and playbooks for configuring the
     pip install -r requirements.txt
     ```
 
+### Step 3: Couldformation templates and Run Ansible Playbook
 
-### Step 3: Deploy CloudFormation Stack and Run Ansible Playbook
-
-1. **Run Deployment Script**:
+1. **Launch the EC2 instance using couldformation template**:
     ```sh
     cd cloudformation-ideahub/scripts
-    python3 deploy.py
+    python3 launch-ec2.py
     ```
     - ```hosts.ini``` file  will be automatically updated with the EC2 instance's IP. You can also manually set this up.
 
@@ -69,6 +68,25 @@ This directory contains Ansible configurations and playbooks for configuring the
     ```
     - When prompted, provide the Ansible Vault password to decrypt sensitive variables.
     - You can also provide your own set of credentials.
+3. **Run the cloud fromation to do deploy a lambder function to do a recurcive DB backup to an s3 bucket**:
+    ```sh
+    cd cloudformation-ideahub/scripts
+    python3 backup.py
+    ```
+4. **Run the cloud fromation to do deploy the ECS cluster, the service and the Task Definition for the ideahub project**:
+    ```sh
+    cd cloudformation-ideahub/scripts
+    python3 deploy.py
+    ```
+### Step 4:Delete Cloudformation 
+To delete cloudformation stack, you only need to run the folloying script:
+
+```
+    cd cloudformation-ideahub/scripts
+    python3 delete.py <stack_name>
+```
+
+The <stack_name> can be found in the main function of the repective scripts used for deployment of the stack.
 
 ## Summary
 
