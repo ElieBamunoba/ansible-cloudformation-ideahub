@@ -11,18 +11,6 @@ def deploy_stack(stack_name, template_file):
 
         parameters = [
             {
-                'ParameterKey': 'InstanceType',
-                'ParameterValue': 't2.micro',
-            },
-            {
-                'ParameterKey': 'KeyName',
-                'ParameterValue': 'elie-ec2',
-            },
-            {
-                'ParameterKey': 'ImageId',
-                'ParameterValue': 'ami-0ad21ae1d0696ad58',
-            },
-            {
                 'ParameterKey': 'SecurityGroup',
                 'ParameterValue': 'sg-04b25b88d0a3ba979',
             }
@@ -76,17 +64,6 @@ def deploy_stack(stack_name, template_file):
     return response
 
 
-# def get_stack_output(stack_name):
-#     cloudformation = boto3.client('cloudformation')
-#     response = cloudformation.describe_stacks(StackName=stack_name)
-#     stack = response['Stacks'][0]
-
-#     outputs = {}
-#     for output in stack['Outputs']:
-#         outputs[output['OutputKey']] = output['OutputValue']
-#     return outputs
-
-
 def update_inventory(ip_address):
     inventory_content = f"[mysql_servers]\n{ip_address}\n"
     with open('../../ansible-ideahub/inventory/hosts.ini', 'w') as inventory_file:
@@ -100,10 +77,3 @@ if __name__ == "__main__":
 
     stack_name = "ideahub-api-stack"
     deploy_stack(stack_name, template_file)
-
-    # Get stack outputs
-    # outputs = get_stack_output(stack_name)
-    # public_ip = outputs['PublicIP']
-    # update_inventory(public_ip)
-
-    # os.system("ansible-playbook -i ../../ansible-ideahub/inventory/hosts.ini ../../ansible-ideahub/playbook.yml --ask-vault-pass")
