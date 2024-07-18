@@ -86,7 +86,7 @@ To delete cloudformation stack, you only need to run the folloying script:
     python3 delete.py <stack_name>
 ```
 
-The <stack_name> can be found in the main function of the repective scripts used for deployment of the stack.
+The <stack_name> can be found in the main function of the repective scripts used to deploy the stack.
 
 ## Summary
 
